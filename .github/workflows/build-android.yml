@@ -1,0 +1,53 @@
+name: Build Native Helicopters Android Probe
+
+on:
+workflow_dispatch:
+push:
+paths:
+- 'aml_armv7_probe/**'
+- '.github/workflows/build-android.yml'
+
+jobs:
+build:
+runs-on: ubuntu-latest
+steps:
+- name: Checkout project
+uses: actions/checkout@v4
+
+  - name: Set up Android SDK
+    uses: android-actions/setup-android@v3
+
+  - name: Install Android NDK
+    run: sdkmanager --install "ndk;27.2.12479018"
+
+  - name: Fetch AML headers
+    run: |
+      git clone --depth 1 https://github.com/RusJJ/AndroidModLoader.git "$RUNNER_TEMP/AndroidModLoader"
+      mkdir -p aml_armv7_probe/include/mod
+      cp -R "$RUNNER_TEMP/AndroidModLoader/include/mod/." aml_armv7_probe/include/mod/
+
+  - name: Build ARMv7 library
+    working-directory: aml_armv7_probe
+    run: |
+      "$ANDROID_HOME/ndk/27.2.12479018/ndk-build" \
+        NDK_PROJECT_PATH=. \
+        APP_BUILD_SCRIPT=Android.mk \
+        NDK_APPLICATION_MK=Application.mk \
+        NDK_OUT="$GITHUB_WORKSPACE/build/obj" \
+        NDK_LIBS_OUT="$GITHUB_WORKSPACE/build/libs" \
+        V=1
+      test -f "$GITHUB_WORKSPACE/build/libs/armeabi-v7a/libNativeHelicoptersAndroidProbe.so"
+
+  - name: Package build
+    run: |
+      mkdir -p release
+      cp build/libs/armeabi-v7a/libNativeHelicoptersAndroidProbe.so release/
+      cp aml_armv7_probe/README_BUILD.md release/
+      cd release
+      zip -r ../NativeHelicoptersAndroidProbe-ARMv7.zip .
+
+  - name: Upload artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: NativeHelicoptersAndroidProbe-ARMv7
+      path: NativeHelicoptersAndroidProbe-ARMv7.zip
